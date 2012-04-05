@@ -7,18 +7,19 @@ import (
 )
 
 type Node struct {
-	tag string
-	text []byte
-	children []Node
+	tag      string
+	text     []byte
+	parent   *Node
+	children []*Node
 }
 
-type Stack []Node
+type Stack []*Node
 
-func (stack Stack) push(node Node) Stack {
+func (stack Stack) push(node *Node) Stack {
 	return append(stack, node)
 }
 
-func (stack Stack) pop() (node Node, res Stack) {
+func (stack Stack) pop() (node *Node, res Stack) {
 	if stack.isEmpty() {
 		return
 	}
@@ -27,7 +28,7 @@ func (stack Stack) pop() (node Node, res Stack) {
 	return
 }
 
-func (stack Stack) peek() (node Node) {
+func (stack Stack) peek() (node *Node) {
 	if stack.isEmpty() {
 		return
 	}
@@ -41,17 +42,21 @@ func (stack Stack) isEmpty() bool {
 
 func parse(reader *bufio.Reader) Node {
 	var (
-		b byte
+		b   byte
 		err error
 
 		state string
-		tag []byte
+		tag   []byte
 
 		dom Stack
 
-		cur Node
-		par Node
+		cur   *Node
+		child *Node
 	)
+
+	cur = new(Node)
+	cur.tag = "document"
+	child = new(Node)
 
 	for err == nil {
 		b, err = reader.ReadByte()
@@ -67,11 +72,12 @@ func parse(reader *bufio.Reader) Node {
 			default:
 				tag = append(tag, b)
 			case '>':
-				cur.tag = string(tag)
-				par.children = append(par.children, cur)
+				child = new(Node)
+				child.tag = string(tag)
+				child.parent = cur
+				cur.children = append(cur.children, child)
 				dom = dom.push(cur)
-				par = cur
-				fmt.Println(ident(len(dom)), cur.tag, string(cur.text))
+				cur = child
 				tag = make([]byte, 10)
 				state = ""
 			}
@@ -95,21 +101,28 @@ func parse(reader *bufio.Reader) Node {
 		}
 
 	}
-	return cur
+	return *cur
 }
 
 func ident(n int) (s string) {
-	for i:=1; i < n; i++ {
+	for i := 1; i < n; i++ {
 		s += "  "
 	}
 	return
+}
+
+func (doc Node) walk(i int) {
+	for _, n := range doc.children {
+		fmt.Println(ident(i), n.tag, len(n.children))
+		n.walk(i + 1)
+	}
 }
 
 func main() {
 	var (
 		file   *os.File
 		reader *bufio.Reader
-		doc Node
+		doc    Node
 	)
 
 	if len(os.Args) > 1 {
@@ -120,5 +133,5 @@ func main() {
 	}
 
 	doc = parse(reader)
-	fmt.Println(doc.tag)
+	doc.walk(1)
 }
